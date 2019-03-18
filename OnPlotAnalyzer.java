@@ -10,6 +10,7 @@ import java.io.FileNotFoundException;
  
 class OnPlotAnalyzer{
 	private static String director = "";	//имя режиссера
+	private static String title = "";		//название фильма
 	private static String filename = "";	//имя файла источника
 	private static String genre = "";		//название жанра
 	private static String country = "";		//название страны
@@ -43,13 +44,18 @@ class OnPlotAnalyzer{
 					    		 */
 					    		while (((values = csvReader.readNext()) != null) && (lineCounter < 12023)) {
 										boolean flag = true;			//Этот флаг определяет нужно ли обрабатывать для рейтинга текущую строку
-										if (director != ""){
-											flag = false;				//Если имя режиссера задано, но в строке его нет, то строка не будет обработана для рейтинга
-											String[] allDirectors = columnParser(values[3]);	//Получение списка режиссеров в данной строке
+										if (title != ""){
+											flag = false;				
+											if (title.equals(values[1])){flag = true;}
+										}else{
+											if (director != ""){
+												flag = false;				//Если имя режиссера задано, но в строке его нет, то строка не будет обработана для рейтинга
+												String[] allDirectors = columnParser(values[3]);	//Получение списка режиссеров в данной строке
 											
-											for (int i = 0; i < allDirectors.length; i++){
-												if (Arrays.stream(allDirectors).anyMatch(director::equals)){flag = true;}
- 											}
+												for (int i = 0; i < allDirectors.length; i++){
+													if (Arrays.stream(allDirectors).anyMatch(director::equals)){flag = true;}
+ 												}
+											}
 										}
 										if (flag){		//Если все заданные параметры содержатся в строке, то она включается в рейтинг
 											filmCounter++;
@@ -222,15 +228,21 @@ class OnPlotAnalyzer{
             if (args[i].equals("-about")){
 				System.out.println("This a kino analyser!");
 			}
+			if (args[i].equals("--filename")){
+				i++;
+				filename = args[i];
+			}
+			if (args[i].equals("--film_uniq_words")){
+				title = modeValuesParser(i+1, args, args[i]);
+				if (title != ""){
+					mode = 1;
+				}
+			}
 			if (args[i].equals("--director_uniq_words")){
 				director = modeValuesParser(i+1, args, args[i]);
 				if (director != ""){
 					mode = 1;
 				}
-			}
-			if (args[i].equals("--filename")){
-				i++;
-				filename = args[i];
 			}
 			i++;
         }
@@ -272,6 +284,9 @@ class OnPlotAnalyzer{
 		String reqName = "";
 		if (mode == 1){
 			reqName = "Rating of unique words in movies by:" + "\n";
+			if (title != ""){
+				reqName += "Movie title: " + title + "\n";
+			}
 			if (director != ""){
 				reqName += "Director: " + director + "\n";
 			}
