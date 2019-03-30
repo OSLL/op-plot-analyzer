@@ -50,6 +50,12 @@ class OnPlotAnalyzer implements Runnable{
     		this.title += mov[i];
     	}
     }
+    
+    @Option(names={"--country_uniq_words"}, description="Сountry where the film was made")
+	void setCountry(String country) {
+		this.mode = 1; 
+		this.country = country;
+	}
     	
     @Option(names = {"--genre_uniq_words"}, arity = "1..*", description = "Movie genre")
     void setGenre(String gen[]) {
@@ -147,6 +153,12 @@ class OnPlotAnalyzer implements Runnable{
 					for (int i = 0; i < allDirectors.length; i++){
 						if (Arrays.stream(allDirectors).anyMatch(director::equals)){lineControl = true;}
  					}
+				}
+				if (lineControl){
+					if (country != ""){
+						lineControl = false;
+						if (country.equals(values[2])){lineControl = true;}
+					}
 				}
 			}
 			if (lineControl){		//Если все заданные параметры содержатся в строке, то она включается в рейтинг
@@ -344,12 +356,9 @@ class OnPlotAnalyzer implements Runnable{
 		String reqName = "";
 		if (mode == 1){
 			reqName = "Rating of unique words in movies by:" + "\n";
-			if (title != ""){
-				reqName += "Movie title: " + title + "\n";
-			}
-			if (director != ""){
-				reqName += "Director: " + director + "\n";
-			}
+			if (title != ""){ reqName += "Movie title: " + title + "\n";}
+			if (director != ""){ reqName += "Director: " + director + "\n";}
+			if (country != ""){ reqName += "Origin: " + country + "\n";}
 		}
 		return reqName;
 	}
