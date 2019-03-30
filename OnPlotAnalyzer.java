@@ -59,34 +59,59 @@ class OnPlotAnalyzer implements Runnable{
     		this.genre += gen[i];}
 	}
 	
-
-						
-	public static void filmsRating(CSVReader csvReader, String reqName){
+	public static void main(String[] args){
+		CommandLine.run(new OnPlotAnalyzer(), args);
+	}
+		
+		
+	/**
+	 *	Запускает обработку параметров командной строки и саму утилиту.
+	 */
 	
+	public void run(){
+		if ((mode >= 1) && (mode <=3)){
+			csvFileReader();
+		}else{
+			System.out.println("Program mode not specified!");
+		}
 	}
 	
-	public static void similarDirectorsRating(CSVReader csvReader, String reqName){
+		
+	/**
+	 *	Организация чтения входного файла.
+	 */
 	
+	public static void csvFileReader (){
+		try (CSVReader csvReader = new CSVReader(new FileReader(filename));) {
+			if ((csvReader.readNext()) != null){		//Чтение первой строки - заголовки столбцов обрабатываться не будут
+				modeDistributor(csvReader);
+    		}		
+		}catch(IOException e){
+			System.out.println("Error! Can't parse file " + filename + "!");
+			e.printStackTrace();
+		}	
 	}
+		
 	
 	/**
 	 *	Запускает режим выполнения программы в соответствии со значением mode
 	 */
 	
 	public static void modeDistributor(CSVReader csvReader) throws IOException{
-		String reqName = requestHeadline(mode); //Название режима, которое будет выведено в консоль
+
 		switch (mode){
-			case 1:	wordsRating(csvReader, reqName);
+			case 1:	wordsRating(csvReader);
 					break;
-			case 2: filmsRating(csvReader, reqName);
+			case 2: filmsRating(csvReader);
 					break;
-			case 3: similarDirectorsRating(csvReader, reqName);
+			case 3: similarDirectorsRating(csvReader);
 					break;
 			default: System.out.println("Wrong mode! Please check your input!");
 					break;
 		}
 	}
-	
+		
+
 	/** 
 	 * Работы утилиты в режиме 1. Осуществляется при указании режимов:	
 	 *		--film_uniq_words		
@@ -96,7 +121,7 @@ class OnPlotAnalyzer implements Runnable{
 	 *		сочетание режимов (director, country, genre)
 	 */
 	
-	public static void wordsRating(CSVReader csvReader, String reqName) throws IOException{
+	public static void wordsRating(CSVReader csvReader) throws IOException{
 		int lineCounter = 0;	//количество обработанных строк файла, нужно только для тестирования поведения программы
 		int filmCounter = 0; 	//количество подошедших по запросу фильмов
 		Map<String, Integer> uniqWords = new HashMap<String, Integer>();
@@ -110,21 +135,21 @@ class OnPlotAnalyzer implements Runnable{
 		 */
 		while (((values = csvReader.readNext()) != null) && (lineCounter < 12023)) {
 	  		if (values.length != 8){throw new IOException("Wrong CSV format, number of columns must be 8!");}
-			boolean flag = true;			//Этот флаг определяет нужно ли обрабатывать для рейтинга текущую строку
+			boolean lineControl = true;			//Этот флаг определяет нужно ли обрабатывать для рейтинга текущую строку
 			if (title != ""){
-				flag = false;				
-				if (title.equals(values[1])){flag = true;}
+				lineControl = false;				
+				if (title.equals(values[1])){lineControl = true;}
 			}else{
 				if (director != ""){
-					flag = false;				//Если имя режиссера задано, но в строке его нет, то строка не будет обработана для рейтинга
+					lineControl = false;				//Если имя режиссера задано, но в строке его нет, то строка не будет обработана для рейтинга
 					String[] allDirectors = columnParser(values[3]);	//Получение списка режиссеров в данной строке
 											
 					for (int i = 0; i < allDirectors.length; i++){
-						if (Arrays.stream(allDirectors).anyMatch(director::equals)){flag = true;}
+						if (Arrays.stream(allDirectors).anyMatch(director::equals)){lineControl = true;}
  					}
 				}
 			}
-			if (flag){		//Если все заданные параметры содержатся в строке, то она включается в рейтинг
+			if (lineControl){		//Если все заданные параметры содержатся в строке, то она включается в рейтинг
 				filmCounter++;
 				String[] plotField = prepForStemmer(values[7]);	//Подготовка списка слов для обработки библиотекой Stemmer
 				for (int j = 0; j<plotField.length; j++){		//Поочередная обработка слов
@@ -142,8 +167,9 @@ class OnPlotAnalyzer implements Runnable{
 			lineCounter++;
     	}
 
-    	wordsRatingOut(uniqWords, reqName, filmCounter);
+    	wordsRatingOut(uniqWords, filmCounter);
 	}
+	
 	
 	/**
 	 *	Выводит на экран результат работы в режиме 1 (mode=1).
@@ -151,13 +177,15 @@ class OnPlotAnalyzer implements Runnable{
 	 *	в соответствии с заданными критериями.
 	 */
 	
-	public static void wordsRatingOut(Map<String, Integer> uniqWords, String reqName, int filmCounter){
+	public static void wordsRatingOut(Map<String, Integer> uniqWords, int filmCounter){
         			
         //Сортировка уникальных слов по убыванию убыванию популярности
         LinkedList<Map.Entry<String, Integer>> list = new LinkedList<>(uniqWords.entrySet());
 		Comparator<Map.Entry<String, Integer>> comparator = Comparator.comparing(Map.Entry::getValue);
 		Collections.sort(list, comparator.reversed());
-					
+		
+		String reqName = requestHeadline(mode); 	//Название режима, которое будет выведено в консоль
+		
 		System.out.println("\n" + reqName);
 		System.out.println("Number of processed movies: " + filmCounter + "\n");
 		for (int i = 0; i<list.size(); i++){
@@ -169,120 +197,28 @@ class OnPlotAnalyzer implements Runnable{
 	}
 	
 	
-	/**
-	 *	Организация чтения файла.
+	/** 
+	 * Работы утилиты в режиме 2. Осуществляется при указании режимов:			
+	 *		--director_raiting
+	 *		--country_raiting
+	 *		--genre_raiting
+	 *		сочетание указанных выше режимов режимов
 	 */
+						
+	public static void filmsRating(CSVReader csvReader){
 	
-	public static void csvFileReader (){
-		try (CSVReader csvReader = new CSVReader(new FileReader(filename));) {
-			if ((csvReader.readNext()) != null){		//Чтение первой строки - заголовки столбцов обрабатываться не будут
-				modeDistributor(csvReader);
-    		}		
-		}catch(IOException e){
-			System.out.println("Error! Can't parse file " + filename + "!");
-			e.printStackTrace();
-		}	
 	}
 	
-	public static void main(String[] args){
-		CommandLine.run(new OnPlotAnalyzer(), args);
-	}
-	
-	/**
-	 *	Запускает обработку параметров командной строки и саму утилиту.
-	 */
-	
-	public void run(){
-		if ((mode >= 1) && (mode <=3)){
-			csvFileReader();
-		}else{
-			System.out.println("Program mode not specified!");
-		}
-	}
-	
-	
-	/**
-	 *	Заполнение мапы с исключениями. Исключения помогают 
-	 *  корректнее разбивать текст на отдельные слова.
-	 */
-	 
-	 public static Map<String, String> plotExcepListGenerator(){
-	 	Map<String, String> excepList = new HashMap<String, String>();
-
-	 	excepList.put("n't", " not");
-		excepList.put("'ll", " will");
-		excepList.put("'d", " would");
-		excepList.put("'ve", " have");
-		excepList.put("'m", " am");
-		excepList.put("'re", " are");
-		
-		excepList.put("' ", " ");
-		excepList.put(" '", " ");
-		excepList.put(" - ", " ");
-		excepList.put("'s", "");
-		excepList.put("’s", "");
-		
-		excepList.put("[^\\p{L}\\s\\-\\']", " ");		//Оставляет в строке только буквы различных алфавитов, тире и кавычки
-		excepList.put("\\s+", " ");
-		
-		return excepList;
-	 }
 	
 	/** 
-	 * Эта функция преобразует поле plot для корректной обработки библиотекой Stemmer.
+	 * Работы утилиты в режиме 3. Осуществляется при указании режима:	
+	 *		--similar_directors
 	 */
-	public static String[] prepForStemmer(String value){
-		Map<String, String> excepList = new HashMap<String, String>();
-		excepList = plotExcepListGenerator();			/*Получение актуальных данных для обработки исключений
-														при разделении строки поля plot на слова*/
-		String str = value;
-		for (Map.Entry<String, String> entry : excepList.entrySet()) {
-			str = str.replaceAll(entry.getKey(), entry.getValue());         
-    	}
-		
-		//StringBuilder использован для увеличения скорости работы метода toLowerCase
-		StringBuilder plotField = new StringBuilder(str);
-		for (int i = 0; i < plotField.length(); i++) {
-   			char c = plotField.charAt(i);
-   			plotField.setCharAt(i, Character.toLowerCase(c));
-		}
-		str = plotField.toString();
-		String[] answer = str.split(" ");
-		
-		//Удаление кавычек в начале и конце слова
-		for (int i = 0; i<answer.length; i++){
-			Character ch = '\'';
-			answer[i] = extraCharRemove(answer[i], ch);
-		}
-		return answer;
+	
+	public static void similarDirectorsRating(CSVReader csvReader){
+	
 	}
-
-	/**
-	 * Удаляет из начала и конца слова лишний символ,
-	 * который мог остаться в процессе разделения строки на слова.
-	 */
-
-	public static String extraCharRemove(String source, Character ch){
-		if (source.length() > 1){
-			if ((source.charAt((source.length())-1)) == ch){
-				source = source.substring(0, source.length()-2);
-			}
-			if (source.length() > 1){
-				if (source.charAt(0) == ch){
-					source = source.substring(1, source.length()-1);
-				}
-			}else{
-				if (source.equals(ch.toString())){
-					source = "";
-				}
-			}
-		}else{
-			if (source.equals(ch.toString())){
-				source = "";
-			}
-		}
-		return source;
-	}
+	
 	
 	/**
 	 * Разделяет входную строку с режиссерами на список режиссеров
@@ -314,6 +250,91 @@ class OnPlotAnalyzer implements Runnable{
 		return ans;
 	}
 
+
+	/** 
+	 * Преобразует поле plot для корректной обработки библиотекой Stemmer.
+	 */
+	public static String[] prepForStemmer(String value){
+		Map<String, String> excepList = new HashMap<String, String>();
+		excepList = plotExcepListGenerator();			/*Получение актуальных данных для обработки исключений
+														при разделении строки поля plot на слова*/
+		String str = value;
+		for (Map.Entry<String, String> entry : excepList.entrySet()) {
+			str = str.replaceAll(entry.getKey(), entry.getValue());         
+    	}
+		
+		//StringBuilder использован для увеличения скорости работы метода toLowerCase
+		StringBuilder plotField = new StringBuilder(str);
+		for (int i = 0; i < plotField.length(); i++) {
+   			char c = plotField.charAt(i);
+   			plotField.setCharAt(i, Character.toLowerCase(c));
+		}
+		str = plotField.toString();
+		String[] answer = str.split(" ");
+		
+		//Удаление кавычек в начале и конце слова
+		for (int i = 0; i<answer.length; i++){
+			Character ch = '\'';
+			answer[i] = extraCharRemove(answer[i], ch);
+		}
+		return answer;
+	}
+
+
+	/**
+	 *	Заполнение мапы с исключениями. Исключения помогают 
+	 *  корректнее разбивать текст на отдельные слова.
+	 */
+	 
+	 public static Map<String, String> plotExcepListGenerator(){
+	 	Map<String, String> excepList = new HashMap<String, String>();
+
+	 	excepList.put("n't", " not");
+		excepList.put("'ll", " will");
+		excepList.put("'d", " would");
+		excepList.put("'ve", " have");
+		excepList.put("'m", " am");
+		excepList.put("'re", " are");
+		
+		excepList.put("' ", " ");
+		excepList.put(" '", " ");
+		excepList.put(" - ", " ");
+		excepList.put("'s", "");
+		excepList.put("’s", "");
+		
+		excepList.put("[^\\p{L}\\s\\-\\']", " ");		//Оставляет в строке только буквы различных алфавитов, тире и кавычки
+		excepList.put("\\s+", " ");
+		
+		return excepList;
+	 }
+	
+
+	/**
+	 * Удаляет из начала и конца слова лишний символ,
+	 * который мог остаться в процессе разделения строки на слова.
+	 */
+
+	public static String extraCharRemove(String source, Character ch){
+		if (source.length() > 1){
+			if ((source.charAt((source.length())-1)) == ch){
+				source = source.substring(0, source.length()-2);
+			}
+			if (source.length() > 1){
+				if (source.charAt(0) == ch){
+					source = source.substring(1, source.length()-1);
+				}
+			}else{
+				if (source.equals(ch.toString())){
+					source = "";
+				}
+			}
+		}else{
+			if (source.equals(ch.toString())){
+				source = "";
+			}
+		}
+		return source;
+	}
 
 	/**
 	 *Задает заголовок режима для вывода информации на экран
