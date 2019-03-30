@@ -134,7 +134,7 @@ class OnPlotAnalyzer implements Runnable{
 		
 		String[] values = null;
 		Stemmer stemm = new Stemmer();
-					
+		int counter = 0;
 		/**
 		 * Пока обрабатываются только первые 12023 строки файла (одна треть)
 		 * т к стандартные библиотеки (в частности opencsv) не читаю далее этот файл корректно
@@ -148,20 +148,40 @@ class OnPlotAnalyzer implements Runnable{
 			}else{
 				if (director != ""){
 					lineControl = false;				//Если имя режиссера задано, но в строке его нет, то строка не будет обработана для рейтинга
-					String[] allDirectors = columnParser(values[3]);	//Получение списка режиссеров в данной строке
+					String[] allDirectors = directorFieldParser(values[3]);	//Получение списка режиссеров в данной строке
 											
 					for (int i = 0; i < allDirectors.length; i++){
 						if (Arrays.stream(allDirectors).anyMatch(director::equals)){lineControl = true;}
- 					}
+					}
+					counter++;
 				}
 				if (lineControl){
 					if (country != ""){
 						lineControl = false;
 						if (country.equals(values[2])){lineControl = true;}
 					}
+					counter++;
+				}
+				if (lineControl){
+					if (genre != ""){
+						lineControl = false;				
+						String[] allGenres = genreFieldParser(values[5]);	//Получение списка стран в данной строке
+											
+						for (int i = 0; i < allGenres.length; i++){
+							if (Arrays.stream(allGenres).anyMatch(genre::equals)){lineControl = true;}
+						}
+					}
+					counter++;
 				}
 			}
 			if (lineControl){		//Если все заданные параметры содержатся в строке, то она включается в рейтинг
+				if (counter > 1){
+					System.out.println("");
+					System.out.print("Year:  " + values[0]);
+					System.out.print("     Movie name:  " + values[1]);
+					for (int q = values[1].length(); q < 40; q++){System.out.print(" ");}
+					System.out.println("Director:  " + values[3]);
+				}
 				filmCounter++;
 				String[] plotField = prepForStemmer(values[7]);	//Подготовка списка слов для обработки библиотекой Stemmer
 				for (int j = 0; j<plotField.length; j++){		//Поочередная обработка слов
@@ -177,6 +197,7 @@ class OnPlotAnalyzer implements Runnable{
 				}
 			}
 			lineCounter++;
+			counter = 0;
     	}
 
     	wordsRatingOut(uniqWords, filmCounter);
@@ -233,11 +254,10 @@ class OnPlotAnalyzer implements Runnable{
 	
 	
 	/**
-	 * Разделяет входную строку с режиссерами на список режиссеров
-	 * (например всех режиссеров или все страны).
+	 * Разделяет входную строку с режиссерами на список режиссеров в конкретном фильме.
 	 */
 
-	public static String[] columnParser(String source){			
+	public static String[] directorFieldParser(String source){			
 		String str = source.replaceAll(" and ", ","); 		//Замена разделителей and и & на запятую для использования line.split(",");
 		str = str.replaceAll(" & ", ","); 
 		
@@ -261,7 +281,29 @@ class OnPlotAnalyzer implements Runnable{
 		}	
 		return ans;
 	}
-
+	
+	
+	/**
+	 * Разделяет входную строку с жанрами на список жанров в конкретном фильме.
+	 */
+	
+	public static String[] genreFieldParser(String source){
+		String str = source;
+		str = extraCharRemove(str, '.');
+		str = extraCharRemove(str, ',');
+		str = str.replaceAll("(film genre)", "");
+		str = str.replaceAll("/", ",");
+		str = str.replaceAll("&", ",");
+		
+		String[] ans = str.split(",");
+		
+		//Удаление пробелов в начале и конце слова
+		for (int i = 0; i<ans.length; i++){
+			Character ch = ' ';
+			ans[i] = extraCharRemove(ans[i], ch);
+		}
+		return ans;
+	}
 
 	/** 
 	 * Преобразует поле plot для корректной обработки библиотекой Stemmer.
@@ -359,6 +401,7 @@ class OnPlotAnalyzer implements Runnable{
 			if (title != ""){ reqName += "Movie title: " + title + "\n";}
 			if (director != ""){ reqName += "Director: " + director + "\n";}
 			if (country != ""){ reqName += "Origin: " + country + "\n";}
+			if (genre != ""){ reqName += "Genre: " + genre + "\n";}
 		}
 		return reqName;
 	}
