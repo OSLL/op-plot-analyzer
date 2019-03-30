@@ -56,7 +56,4 @@ java -cp "./jars/*:" OnPlotAnalyzer --director_uniq_words Mack Sennett --filenam
 		- файл README.md - описание проекта (в итерации 4 это описание будет преобразовано в вики страницы)
 		- файл OnPlotAnalyzer.java - главный файл утилиты
 		- файл OnPlotAnalyzer.class - скомпилированный файл OnPlotAnalyzer.java
-		- папка test содержит тестовые файлы, ненужные для функционирования программы
-	(в конце разработки эта папка будет удалена). 
-
-	  		
+	  	

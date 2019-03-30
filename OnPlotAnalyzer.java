@@ -1,5 +1,7 @@
 import com.opencsv.*;						//библиотека для чтения csv файла
 import edu.stanford.nlp.process.*;			//библиотека для приведения слов в начальную форму Stemmer
+import picocli.CommandLine;					//библиотека picocli v3.9.5 для обработки параметров командной строки
+import picocli.CommandLine.*;
 
 import java.io.FileReader;
 import java.io.IOException;
@@ -7,8 +9,9 @@ import java.io.IOException;
 import java.util.*;
 import java.io.File;
 import java.io.FileNotFoundException;
- 
-class OnPlotAnalyzer{
+
+@Command(name = "OnPlotAnalyzer", header = "%n@|green Utility help|@")
+class OnPlotAnalyzer implements Runnable{
 	private static String director = "";	//имя режиссера
 	private static String title = "";		//название фильма
 	private static String filename = "";	//имя файла источника
@@ -22,117 +25,220 @@ class OnPlotAnalyzer{
 						//			сочетание режимов (director, country, genre)
 						//режим 2:
 						//режим 3:
-	public static void main(String[] args) {
-		mode = modeDetector(args); //определение режима выполнения программы
-		if ((mode >= 1) && (mode <=3)){
-			if (filename.equals("")){   //проверка на наличие названия файла
-				System.out.println("The file name has not been set. Please restart the program and specify a source name in --filename argument.");
-			}else{
-				String reqName = requestHeadline(mode); //Название режима, которое будет выведено в консоль
-				if(mode == 1){
-					int lineCounter = 0;	//количество обработанных строк файла, нужно только для тестирования поведения программы
-					int filmCounter = 0; 	//количество подошедших по запросу фильмов
-					Map<String, Integer> uniqWords = new HashMap<String, Integer>();
-					//Map<Character, Integer> uniqSymbols = new HashMap<Character, Integer>();		//Подсчет количества уникальных символов, тестовое значение	
-					Stemmer stemm = new Stemmer();	//
-					try (CSVReader csvReader = new CSVReader(new FileReader(filename));) {
-							if ((csvReader.readNext()) != null){		//Чтение первой строки - заголовки столбцов обрабатываться не будут
-					    		String[] values = null;					
-					    		/**
-					    		 * Пока обрабатываются только первые 12023 строки файла (одна треть)
-					    		 * т к стандартные библиотеки (в частности opencsv) не читаю далее этот файл корректно
-					    		 */
-					    		while (((values = csvReader.readNext()) != null) && (lineCounter < 12023)) {
-										boolean flag = true;			//Этот флаг определяет нужно ли обрабатывать для рейтинга текущую строку
-										if (title != ""){
-											flag = false;				
-											if (title.equals(values[1])){flag = true;}
-										}else{
-											if (director != ""){
-												flag = false;				//Если имя режиссера задано, но в строке его нет, то строка не будет обработана для рейтинга
-												String[] allDirectors = columnParser(values[3]);	//Получение списка режиссеров в данной строке
-											
-												for (int i = 0; i < allDirectors.length; i++){
-													if (Arrays.stream(allDirectors).anyMatch(director::equals)){flag = true;}
- 												}
-											}
-										}
-										if (flag){		//Если все заданные параметры содержатся в строке, то она включается в рейтинг
-											filmCounter++;
-											String[] plotField = prepForStemmer(values[7]);	//Подготовка списка слов для обработки библиотекой Stemmer
-											for (int j = 0; j<plotField.length; j++){		//Поочередная обработка слов
-												String mstr = stemm.stem(plotField[j]);		
 
-												if (uniqWords.keySet().contains(mstr)){
-													int t = uniqWords.get(mstr);
-													uniqWords.put(mstr, t + 1);
-												}else{
-													uniqWords.put(mstr, 1);
-												}
-												//Хранение списка уникальных символов слов
-												/*for (int i = 0; i<mstr.length(); i++){
-													if (uniqSymbols.keySet().contains(mstr.charAt(i))){
-														int t = uniqSymbols.get(mstr.charAt(i));
-														uniqSymbols.put(mstr.charAt(i), t+1);
-													}else{
-														uniqSymbols.put(mstr.charAt(i), 1);
-													}
-												}*/
-											}
-										}
-									lineCounter++;
-    							}
-    						}		
-					}catch(IOException e){}
-					//Сортировка и вывод уникальных символов
-        			/*LinkedList<Map.Entry<Character, Integer>> list = new LinkedList<>(uniqSymbols.entrySet());
-					Comparator<Map.Entry<Character, Integer>> comparator = Comparator.comparing(Map.Entry::getValue);
-					Collections.sort(list, comparator.reversed());
-        			System.out.println(uniqSymbols);
-        			for (int i = 0; i<list.size(); i++){
-        				System.out.println(list.get(i));
-        			}*/
-        			
-        			//Сортировка уникальных слов по убыванию убыванию популярности
-        			LinkedList<Map.Entry<String, Integer>> listW = new LinkedList<>(uniqWords.entrySet());
-					Comparator<Map.Entry<String, Integer>> comparatorW = Comparator.comparing(Map.Entry::getValue);
-					Collections.sort(listW, comparatorW.reversed());
+	//Чтение параметров командной строки
+	@Option(names = {"-about"}, usageHelp = true, description = "Help menu")
+    private boolean help;
+    
+	@Option(names = {"--director_uniq_words"}, arity = "1..*", description = "Director name")
+    void setDirector(String dir[]) {
+    	this.mode = 1;
+    	for (int i = 0; i< dir.length; i++){
+	    	if (i != 0){this.director += " ";}
+    		this.director += dir[i];
+    	}
+    }
+	
+	@Option(names={"-f", "--filename"}, description="Path and name of file", required=true)
+	void setFilename(String filename) { this.filename = filename;}
+	
+	@Option(names = {"--film_uniq_words"}, arity = "1..*", description = "Movie title")
+    void setTitle(String mov[]) {
+    	this.mode = 1;
+    	for (int i = 0; i< mov.length; i++){
+    		if (i != 0){this.title += " ";}
+    		this.title += mov[i];
+    	}
+    }
+    	
+    @Option(names = {"--genre_uniq_words"}, arity = "1..*", description = "Movie genre")
+    void setGenre(String gen[]) {
+		this.mode = 1;
+    	for (int i = 0; i< gen.length; i++){
+    		if (i != 0){this.genre += " ";}
+    		this.genre += gen[i];}
+	}
+	
+
 						
-					System.out.println("\n" + reqName);
-					System.out.println("Number of processed movies: " + filmCounter + "\n");
-					for (int i = 0; i<listW.size(); i++){
-        				System.out.println(listW.get(i));
-        			}
-        			
-        			System.out.println("\n" + "Количество слов: " + uniqWords.size());
-					//System.out.println("\n" + "Number of lines: " + counter);		//Количество обработанных строк файла записей		
+	public static void filmsRating(CSVReader csvReader, String reqName){
+	
+	}
+	
+	public static void similarDirectorsRating(CSVReader csvReader, String reqName){
+	
+	}
+	
+	/**
+	 *	Запускает режим выполнения программы в соответствии со значением mode
+	 */
+	
+	public static void modeDistributor(CSVReader csvReader) throws IOException{
+		String reqName = requestHeadline(mode); //Название режима, которое будет выведено в консоль
+		switch (mode){
+			case 1:	wordsRating(csvReader, reqName);
+					break;
+			case 2: filmsRating(csvReader, reqName);
+					break;
+			case 3: similarDirectorsRating(csvReader, reqName);
+					break;
+			default: System.out.println("Wrong mode! Please check your input!");
+					break;
+		}
+	}
+	
+	/** 
+	 * Работы утилиты в режиме 1. Осуществляется при указании режимов:	
+	 *		--film_uniq_words		
+	 *		--director_uniq_words
+	 *		--country_uniq_words
+	 *		--genre_uniq_words
+	 *		сочетание режимов (director, country, genre)
+	 */
+	
+	public static void wordsRating(CSVReader csvReader, String reqName) throws IOException{
+		int lineCounter = 0;	//количество обработанных строк файла, нужно только для тестирования поведения программы
+		int filmCounter = 0; 	//количество подошедших по запросу фильмов
+		Map<String, Integer> uniqWords = new HashMap<String, Integer>();
+		
+		String[] values = null;
+		Stemmer stemm = new Stemmer();
+					
+		/**
+		 * Пока обрабатываются только первые 12023 строки файла (одна треть)
+		 * т к стандартные библиотеки (в частности opencsv) не читаю далее этот файл корректно
+		 */
+		while (((values = csvReader.readNext()) != null) && (lineCounter < 12023)) {
+	  		if (values.length != 8){throw new IOException("Wrong CSV format, number of columns must be 8!");}
+			boolean flag = true;			//Этот флаг определяет нужно ли обрабатывать для рейтинга текущую строку
+			if (title != ""){
+				flag = false;				
+				if (title.equals(values[1])){flag = true;}
+			}else{
+				if (director != ""){
+					flag = false;				//Если имя режиссера задано, но в строке его нет, то строка не будет обработана для рейтинга
+					String[] allDirectors = columnParser(values[3]);	//Получение списка режиссеров в данной строке
+											
+					for (int i = 0; i < allDirectors.length; i++){
+						if (Arrays.stream(allDirectors).anyMatch(director::equals)){flag = true;}
+ 					}
 				}
 			}
+			if (flag){		//Если все заданные параметры содержатся в строке, то она включается в рейтинг
+				filmCounter++;
+				String[] plotField = prepForStemmer(values[7]);	//Подготовка списка слов для обработки библиотекой Stemmer
+				for (int j = 0; j<plotField.length; j++){		//Поочередная обработка слов
+					String mstr = stemm.stem(plotField[j]);		
+
+					if (uniqWords.keySet().contains(mstr)){
+						int t = uniqWords.get(mstr);
+						uniqWords.put(mstr, t + 1);
+					}else{
+						uniqWords.put(mstr, 1);
+					}
+
+				}
+			}
+			lineCounter++;
+    	}
+
+    	wordsRatingOut(uniqWords, reqName, filmCounter);
+	}
+	
+	/**
+	 *	Выводит на экран результат работы в режиме 1 (mode=1).
+	 *	Режим выводит рейтинг частоты употребления слов,
+	 *	в соответствии с заданными критериями.
+	 */
+	
+	public static void wordsRatingOut(Map<String, Integer> uniqWords, String reqName, int filmCounter){
+        			
+        //Сортировка уникальных слов по убыванию убыванию популярности
+        LinkedList<Map.Entry<String, Integer>> list = new LinkedList<>(uniqWords.entrySet());
+		Comparator<Map.Entry<String, Integer>> comparator = Comparator.comparing(Map.Entry::getValue);
+		Collections.sort(list, comparator.reversed());
+					
+		System.out.println("\n" + reqName);
+		System.out.println("Number of processed movies: " + filmCounter + "\n");
+		for (int i = 0; i<list.size(); i++){
+        	System.out.println(list.get(i));
+        }
+        			
+        System.out.println("\n" + "Words number: " + uniqWords.size());
+		//System.out.println("\n" + "Number of lines: " + counter);		//Количество обработанных строк файла записей
+	}
+	
+	
+	/**
+	 *	Организация чтения файла.
+	 */
+	
+	public static void csvFileReader (){
+		try (CSVReader csvReader = new CSVReader(new FileReader(filename));) {
+			if ((csvReader.readNext()) != null){		//Чтение первой строки - заголовки столбцов обрабатываться не будут
+				modeDistributor(csvReader);
+    		}		
+		}catch(IOException e){
+			System.out.println("Error! Can't parse file " + filename + "!");
+			e.printStackTrace();
+		}	
+	}
+	
+	public static void main(String[] args){
+		CommandLine.run(new OnPlotAnalyzer(), args);
+	}
+	
+	/**
+	 *	Запускает обработку параметров командной строки и саму утилиту.
+	 */
+	
+	public void run(){
+		if ((mode >= 1) && (mode <=3)){
+			csvFileReader();
 		}else{
 			System.out.println("Program mode not specified!");
 		}
 	}
 	
+	
+	/**
+	 *	Заполнение мапы с исключениями. Исключения помогают 
+	 *  корректнее разбивать текст на отдельные слова.
+	 */
+	 
+	 public static Map<String, String> plotExcepListGenerator(){
+	 	Map<String, String> excepList = new HashMap<String, String>();
+
+	 	excepList.put("n't", " not");
+		excepList.put("'ll", " will");
+		excepList.put("'d", " would");
+		excepList.put("'ve", " have");
+		excepList.put("'m", " am");
+		excepList.put("'re", " are");
+		
+		excepList.put("' ", " ");
+		excepList.put(" '", " ");
+		excepList.put(" - ", " ");
+		excepList.put("'s", "");
+		excepList.put("’s", "");
+		
+		excepList.put("[^\\p{L}\\s\\-\\']", " ");		//Оставляет в строке только буквы различных алфавитов, тире и кавычки
+		excepList.put("\\s+", " ");
+		
+		return excepList;
+	 }
+	
 	/** 
 	 * Эта функция преобразует поле plot для корректной обработки библиотекой Stemmer.
 	 */
 	public static String[] prepForStemmer(String value){
-	
-		String str = value.replaceAll("n't", " not");
-		str = str.replaceAll("'ll", " will");
-		str = str.replaceAll("'d", " would");
-		str = str.replaceAll("'ve", " have");
-		str = str.replaceAll("'m", " am");
-		str = str.replaceAll("'re", " are");
-		
-		str = str.replaceAll("' ", " ");
-		str = str.replaceAll(" '", " ");
-		str = str.replaceAll(" - ", " ");
-		str = str.replaceAll("'s", "");
-		str = str.replaceAll("’s", "");
-		
-		str = str.replaceAll("[^\\p{L}\\s\\-\\']", " ");		//Оставляет в строке только буквы различных алфавитов, тире и кавычки
-		str = str.replaceAll("\\s+", " ");
+		Map<String, String> excepList = new HashMap<String, String>();
+		excepList = plotExcepListGenerator();			/*Получение актуальных данных для обработки исключений
+														при разделении строки поля plot на слова*/
+		String str = value;
+		for (Map.Entry<String, String> entry : excepList.entrySet()) {
+			str = str.replaceAll(entry.getKey(), entry.getValue());         
+    	}
 		
 		//StringBuilder использован для увеличения скорости работы метода toLowerCase
 		StringBuilder plotField = new StringBuilder(str);
@@ -210,73 +316,6 @@ class OnPlotAnalyzer{
 
 
 	/**
-	 * Определяет режим, в котором будет выполняться программа.
-	 * режим 1:	--film_uniq_words		
-	 *			--director_uniq_words
-	 *			--country_uniq_words
-	 *			--genre_uniq_words
-	 *			сочетание режимов (director, country, genre)
-	 * режим 2:
-	 * режим 3:
-	 */
-
-	public static int modeDetector(String[] args){ 
-		int i = 0;
-		int mode = -1;
-		
-		while(i < args.length) {
-            if (args[i].equals("-about")){
-				System.out.println("This a kino analyser!");
-			}
-			if (args[i].equals("--filename")){
-				i++;
-				filename = args[i];
-			}
-			if (args[i].equals("--film_uniq_words")){
-				title = modeValuesParser(i+1, args, args[i]);
-				if (title != ""){
-					mode = 1;
-				}
-			}
-			if (args[i].equals("--director_uniq_words")){
-				director = modeValuesParser(i+1, args, args[i]);
-				if (director != ""){
-					mode = 1;
-				}
-			}
-			i++;
-        }
-		return mode;
-	}
-	
-	/**
-	 * Считывание значения параметра из консоли
-	 */
-
-	public static String modeValuesParser (int i, String[] args, String regimeName){
-		String inputValue = "";
-		if (!((args[i].substring(0,1)).equals("-")) && !(i < args.length)){
-			System.out.println("Parameter " + regimeName + " was not processed! It is empty!");
-		}else{
-			boolean flag = true;
-			boolean nullWordFlag = true;			//Не дает добавить лишний пробел перед значением переменной
-			while ((flag)&&(i<args.length)){
-				if ((args[i].substring(0, 1)).equals("-")){		//Значение параметра считывается либо до конца входной строки либо до начала другого параметра (символ "-")
-					flag = false;
-				}else{
-					if (!nullWordFlag){
-						inputValue = inputValue + " ";
-					}
-					inputValue = inputValue + args[i];
-					nullWordFlag = false;
-					i++;
-				}
-			}
-		}
-		return inputValue;
-	}
-	
-	/**
 	 *Задает заголовок режима для вывода информации на экран
 	 */
 	 
@@ -295,14 +334,12 @@ class OnPlotAnalyzer{
 	}
 
 
-	
 	/**
 	 * Тестовая функция для определения уникальных составляющих массива строк.
 	 * Используется для анализа прочитанных данных.
 	 */
+	 
 	public static void uniqComponents (String[] ans){			
-																
-		
 		HashSet<String> uniqDirectors = new HashSet<String>();
 		for (int i = 0; i < ans.length; i++){
 			uniqDirectors.add(ans[i]);
@@ -310,7 +347,6 @@ class OnPlotAnalyzer{
         for (String s : uniqDirectors){
 	    	System.out.println(s);
         }
-		
 	}
 }
 
