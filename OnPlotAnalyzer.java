@@ -26,6 +26,7 @@ class OnPlotAnalyzer implements Runnable{
 						//режим 2:	--director_raiting
 	private static boolean dirRating = false;
 	private static boolean genRating = false;
+	private static boolean conRating = false;
 						//режим 3:
 
 	//Чтение параметров командной строки
@@ -80,6 +81,12 @@ class OnPlotAnalyzer implements Runnable{
     void setGenRating(boolean f){
     	this.mode = 2;
     	this.genRating = true;
+    }
+    
+    @Option(names = {"--country_raiting"}, description = "Country rating by the number of unique words")
+    void setConRating(boolean f){
+    	this.mode = 2;
+    	this.conRating = true;
     }
 	
 	
@@ -282,10 +289,8 @@ class OnPlotAnalyzer implements Runnable{
 						
 	public static Map<String, Set<String>> filmsRating(String[] values, Map<String, Set<String>> records, Stemmer stemm){
 		String key = "";
-		String[] allDirectors = null;
-		String[] allGenres = null;
-		if (dirRating){allDirectors = directorFieldParser(values[3]);}						
-		if (genRating){allGenres = genreFieldParser(values[5]);}	
+		String[] allDirectors = directorFieldParser(values[3]);
+		String[] allGenres = genreFieldParser(values[5]);
 		int i = 0;
 		int j = 0;
 		do{							
@@ -293,6 +298,10 @@ class OnPlotAnalyzer implements Runnable{
 				if (dirRating) {key = allDirectors[i];}
 				if ((dirRating) && (genRating)){key += "#";}
 				if (genRating) {key += allGenres[j];}
+				if (conRating){
+					if (key != ""){key += "#";}
+					key += values[2];
+				}
 				Set<String> words = records.get(key);
 				if (words == null){
 					words = new HashSet<String>();
@@ -305,6 +314,7 @@ class OnPlotAnalyzer implements Runnable{
 					words.add(mstr);	
 				}
 				j++;
+				key = "";
 			}while(j < allGenres.length);
 			j = 0;
 			i++;
@@ -335,11 +345,28 @@ class OnPlotAnalyzer implements Runnable{
 		
 		String reqName = requestHeadline(); 	//Название режима, которое будет выведено в консоль
 		System.out.println("\n" + reqName);
-		if ((dirRating) && (!genRating)){System.out.println("Total number of directors: " + setList.size() + "\n");}
-		if ((!dirRating) && (genRating)){System.out.println("Total number of genres: " + setList.size() + "\n");}
-		if ((dirRating) && (genRating)){
-			System.out.println("Total number of combinations director&genre: " + setList.size() + "\n");
-			System.out.println("Director                                Genre                                   Number");
+		if ((dirRating) && (!genRating) && (!conRating)){System.out.println("Total number of directors: " + setList.size() + "\n");}
+		if ((!dirRating) && (genRating) && (!conRating)){System.out.println("Total number of genres: " + setList.size() + "\n");}
+		if ((!dirRating) && (!genRating) && (conRating)){System.out.println("Total number of countries: " + setList.size() + "\n");}
+		if (((dirRating) && (genRating)) || ((dirRating) && (conRating)) || ((genRating) && (conRating))){
+			System.out.print("Total number of combinations ");
+			String head = "";
+			if (dirRating){
+				System.out.print("director");
+				head += "Director                                ";
+			}
+			if (genRating){
+				if (dirRating){System.out.print("&");}
+				System.out.print("genre");
+				head += "Genre                                   ";
+			}
+			if (conRating){
+				if ((dirRating) || (genRating)){System.out.print("&");}
+				System.out.print("country");
+				head += "Country                                 ";
+			}
+			System.out.println(": " + setList.size() + "\n");
+			System.out.println(head + "Number");
 		}
 		
 		for (int i = 0; i<list.size(); i++){
@@ -521,10 +548,14 @@ class OnPlotAnalyzer implements Runnable{
 			reqName = "Ranking by the number of unique words in plots." + "\n" + "Formed by:  ";
 			if (dirRating){
 				reqName += "directors";
-				if (genRating){reqName +=", ";}
 			}
 			if (genRating){
+				if (dirRating){reqName +=", ";}
 				reqName += "genres";
+			}
+			if (conRating){
+				if ((dirRating) || (genRating)){reqName +=", ";}
+				reqName += "countries";
 			}
 			reqName += "\n";
 		}
