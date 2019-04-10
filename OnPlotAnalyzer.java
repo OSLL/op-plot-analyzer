@@ -94,6 +94,15 @@ class OnPlotAnalyzer implements Runnable{
 		CommandLine.run(new OnPlotAnalyzer(), args);
 	}
 		
+	//mode 3
+	@Option(names = {"--similar_directors"}, arity = "1..*", description = "List of directors in descending order of the degree of intersection of their vocabulary")
+    void setDirec(String dir[]) {
+    	this.mode = 3;
+    	for (int i = 0; i< dir.length; i++){
+	    	if (i != 0){this.director += " ";}
+    		this.director += dir[i];
+    	}
+    }	
 		
 	/**
 	 *	Запускает обработку параметров командной строки и саму утилиту.
@@ -138,11 +147,9 @@ class OnPlotAnalyzer implements Runnable{
 								uniqWords = includeString(values[7], uniqWords, stemm);
 							}
 							break;
-						case 2: 
-							filmsRating(values, records, stemm);
-							break;
+						case 2:
 						case 3: 
-							similarDirectorsRating(values);
+							records = filmsRating(values, records, stemm);
 							break;
 						default: System.out.println("Wrong mode! Please check your input!");
 							break;
@@ -157,7 +164,10 @@ class OnPlotAnalyzer implements Runnable{
 						filmsRatingOut(records);
 						break;
 					case 3: 
-						similarDirectorsRating(values);
+						uniqWords = similarDirectorsRating(uniqWords, records);
+						if (uniqWords.size() > 0){
+							wordsRatingOut(uniqWords, filmCounter);
+						}
 						break;
 					default: 
 						break;
@@ -254,14 +264,15 @@ class OnPlotAnalyzer implements Runnable{
 	
 	
 	/**
-	 *	Выводит на экран результат работы в режиме 1 (mode=1).
+	 *	Выводит на экран результат работы в режимах 1 и 3 (mode==1 или mode==3).
 	 *	Режим выводит рейтинг частоты употребления слов,
-	 *	в соответствии с заданными критериями.
+	 *	в соответствии с заданными критериями при mode == 1.
+	 *  И 
 	 */
 	
 	public static void wordsRatingOut(Map<String, Integer> uniqWords, int filmCounter){
         			
-        //Сортировка уникальных слов по убыванию убыванию популярности
+        //Сортировка по убыванию популярности
         LinkedList<Map.Entry<String, Integer>> list = new LinkedList<>(uniqWords.entrySet());
 		Comparator<Map.Entry<String, Integer>> comparator = Comparator.comparing(Map.Entry::getValue);
 		Collections.sort(list, comparator.reversed());
@@ -269,12 +280,12 @@ class OnPlotAnalyzer implements Runnable{
 		String reqName = requestHeadline(); 	//Название режима, которое будет выведено в консоль
 		
 		System.out.println("\n" + reqName);
-		System.out.println("Number of processed movies: " + filmCounter + "\n");
+		if (mode == 1){System.out.println("Number of processed movies: " + filmCounter + "\n");}
+		if (mode == 3){System.out.println("Input director: " + director + "\n");}
 		for (int i = 0; i<list.size(); i++){
         	System.out.println(list.get(i));
         }
-        			
-        System.out.println("\n" + "Words number: " + uniqWords.size());
+        if (mode == 1){System.out.println("\n" + "Words number: " + uniqWords.size());}
 		//System.out.println("\n" + "Number of lines: " + counter);		//Количество обработанных строк файла записей
 	}
 	
@@ -295,7 +306,7 @@ class OnPlotAnalyzer implements Runnable{
 		int j = 0;
 		do{							
 			do{
-				if (dirRating) {key = allDirectors[i];}
+				if ((dirRating) || (mode == 3)) {key = allDirectors[i];}
 				if ((dirRating) && (genRating)){key += "#";}
 				if (genRating) {key += allGenres[j];}
 				if (conRating){
@@ -381,16 +392,38 @@ class OnPlotAnalyzer implements Runnable{
 			}
     		System.out.println(temp.getValue());
         }
-        //System.out.println("Nice");
 	}
+	
 	
 	/** 
 	 * Работы утилиты в режиме 3. Осуществляется при указании режима:	
 	 *		--similar_directors
+	 * Возвращает карту с данными о пересечении словарных 
+	 * запасов указанного режиссера со всеми остальными.
 	 */
 	
-	public static void similarDirectorsRating(String[] values){
-	
+	public static Map<String,Integer> similarDirectorsRating(Map<String, Integer> uniqWords, Map<String, Set<String>> records){
+		Set<String> words = new HashSet<String>();
+		words = records.get(director);
+		records.remove(director);
+		
+		if (words != null){
+			Iterator recIt = records.entrySet().iterator();
+    		while (recIt.hasNext()) {
+    			int commWords = 0;
+        		Map.Entry entry = (Map.Entry)recIt.next();
+        		String curDirector = (String) entry.getKey();
+        		Set<String> curWords = new HashSet<String>();
+				curWords = records.get(curDirector);
+        		curWords.retainAll(words);
+        		commWords = curWords.size();
+        		uniqWords.put((String) entry.getKey(), commWords);
+       			recIt.remove();
+    		}
+    	}else{
+    		System.out.println("\n" + "Error! This file does not contain the specified director!");
+    	}
+		return uniqWords;	
 	}
 	
 	
@@ -559,23 +592,9 @@ class OnPlotAnalyzer implements Runnable{
 			}
 			reqName += "\n";
 		}
+		if (mode == 3){
+			reqName = "List of directors in descending order of the degree of intersection of their vocabulary";
+		}
 		return reqName;
 	}
-
-
-	/**
-	 * Тестовая функция для определения уникальных составляющих массива строк.
-	 * Используется для анализа прочитанных данных.
-	 */
-	 
-	public static void uniqComponents (String[] ans){			
-		HashSet<String> uniqDirectors = new HashSet<String>();
-		for (int i = 0; i < ans.length; i++){
-			uniqDirectors.add(ans[i]);
- 		}
-        for (String s : uniqDirectors){
-	    	System.out.println(s);
-        }
-	}
 }
-
