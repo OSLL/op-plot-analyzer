@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.util.*;
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.util.concurrent.TimeUnit;
 
 @Command(name = "OnPlotAnalyzer", header = "%n@|green Utility help|@")
 class OnPlotAnalyzer implements Runnable{
@@ -124,7 +125,7 @@ class OnPlotAnalyzer implements Runnable{
 	public static void csvFileReader (){
 		try (CSVReader csvReader = new CSVReader(new FileReader(filename));) {
 			if ((csvReader.readNext()) != null){		//Чтение первой строки - заголовки столбцов обрабатываться не будут
-				
+				int numOfFileLines = 12023;
 				int lineCounter = 0;	//количество обработанных строк файла
 				int filmCounter = 0; 	//количество подошедших по запросу фильмов
 				Map<String, Integer> uniqWords = new HashMap<String, Integer>();
@@ -136,7 +137,14 @@ class OnPlotAnalyzer implements Runnable{
 		 		 * Пока обрабатываются только первые 12023 строки файла (одна треть)
 		 		 * т к стандартные библиотеки (в частности opencsv) не читаю далее этот файл корректно
 		 		 */
-				while (((values = csvReader.readNext()) != null) && (lineCounter < 12023)) {
+		 		 
+		 		System.out.print("Progress: 00%");
+		 		System.out.write('\b');
+		 		//System.out.write('\b');
+		 		int percent = 0;
+		 		boolean firstTen = true; 
+		 		 
+				while (((values = csvReader.readNext()) != null) && (lineCounter < numOfFileLines)) {
 	  				if (values.length != 8){throw new IOException("Wrong CSV format, number of columns must be 8!");}
 	  				
 	  				switch (mode){
@@ -155,7 +163,23 @@ class OnPlotAnalyzer implements Runnable{
 							break;
 					}
 					lineCounter++;
-			    }
+					
+					//Отображение прогресса вычислений в процентах
+					
+					System.out.write('\b');
+					if (percent >= 10){
+						System.out.write('\b');
+					}
+					percent = (lineCounter * 100) / numOfFileLines;
+					if ((percent == 10) && (firstTen)){
+						System.out.write('\b');
+						firstTen = false;
+					}
+					System.out.print(percent);	
+					
+			    }					
+				System.out.println("%");
+				
 				switch (mode){
 					case 1:	
 						wordsRatingOut(uniqWords, filmCounter);
@@ -283,7 +307,7 @@ class OnPlotAnalyzer implements Runnable{
 		if (mode == 1){System.out.println("Number of processed movies: " + filmCounter + "\n");}
 		if (mode == 3){System.out.println("Input director: " + director + "\n");}
 		for (int i = 0; i<list.size(); i++){
-        	System.out.println(list.get(i));
+    		System.out.println(list.get(i));
         }
         if (mode == 1){System.out.println("\n" + "Words number: " + uniqWords.size());}
 		//System.out.println("\n" + "Number of lines: " + counter);		//Количество обработанных строк файла записей
